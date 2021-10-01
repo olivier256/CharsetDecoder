@@ -30,16 +30,19 @@ import java.nio.charset.CoderResult;
 
 /**
  * Utility class for dealing with surrogates.
+ * 
  * @author Mark Reinhold
  * @author Martin Buchholz
  * @author Ulf Zibis
+ * 
+ * @see http://www.docjar.com/html/api/sun/nio/cs/Surrogate.java.html
  */
 public class Surrogate {
 
 	private Surrogate() {
 	}
 
-	// TODO: Deprecate/remove the following redundant definitions
+	// Deprecate/remove the following redundant definitions
 	public static final char MIN_HIGH = Character.MIN_HIGH_SURROGATE;
 
 	public static final char MAX_HIGH = Character.MAX_HIGH_SURROGATE;
@@ -57,65 +60,78 @@ public class Surrogate {
 	public static final int UCS4_MAX = Character.MAX_CODE_POINT;
 
 	/**
-	 * Tells whether or not the given value is in the high surrogate range. Use of {@link Character#isHighSurrogate} is generally preferred.
+	 * Tells whether or not the given value is in the high surrogate range. Use of
+	 * {@link Character#isHighSurrogate} is generally preferred.
 	 */
 	public static boolean isHigh(final int c) {
 		return MIN_HIGH <= c && c <= MAX_HIGH;
 	}
 
 	/**
-	 * Tells whether or not the given value is in the low surrogate range. Use of {@link Character#isLowSurrogate} is generally preferred.
+	 * Tells whether or not the given value is in the low surrogate range. Use of
+	 * {@link Character#isLowSurrogate} is generally preferred.
 	 */
 	public static boolean isLow(final int c) {
 		return MIN_LOW <= c && c <= MAX_LOW;
 	}
 
 	/**
-	 * Tells whether or not the given value is in the surrogate range. Use of {@link Character#isSurrogate} is generally preferred.
+	 * Tells whether or not the given value is in the surrogate range. Use of
+	 * {@link Character#isSurrogate} is generally preferred.
 	 */
 	public static boolean is(final int c) {
 		return MIN <= c && c <= MAX;
 	}
 
 	/**
-	 * Tells whether or not the given UCS-4 character must be represented as a surrogate pair in UTF-16. Use of
-	 * {@link Character#isSupplementaryCodePoint} is generally preferred.
+	 * Tells whether or not the given UCS-4 character must be represented as a
+	 * surrogate pair in UTF-16. Use of {@link Character#isSupplementaryCodePoint}
+	 * is generally preferred.
 	 */
 	public static boolean neededFor(final int uc) {
 		return Character.isSupplementaryCodePoint(uc);
 	}
 
 	/**
-	 * Returns the high UTF-16 surrogate for the given supplementary UCS-4 character. Use of {@link Character#highSurrogate} is generally preferred.
+	 * Returns the high UTF-16 surrogate for the given supplementary UCS-4
+	 * character. Use of {@link Character#highSurrogate} is generally preferred.
 	 */
 	public static char high(final int uc) {
-		assert Character.isSupplementaryCodePoint(uc);
+		if (!Character.isSupplementaryCodePoint(uc)) {
+			throw new IllegalArgumentException(uc + " shoule be in the supplementary character range");
+		}
 		return Character.highSurrogate(uc);
 	}
 
 	/**
-	 * Returns the low UTF-16 surrogate for the given supplementary UCS-4 character. Use of {@link Character#lowSurrogate} is generally preferred.
+	 * Returns the low UTF-16 surrogate for the given supplementary UCS-4 character.
+	 * Use of {@link Character#lowSurrogate} is generally preferred.
 	 */
 	public static char low(final int uc) {
-		assert Character.isSupplementaryCodePoint(uc);
+		if (!Character.isSupplementaryCodePoint(uc)) {
+			throw new IllegalArgumentException(uc + " shoule be in the supplementary character range");
+		}
 		return Character.lowSurrogate(uc);
 	}
 
 	/**
-	 * Converts the given surrogate pair into a 32-bit UCS-4 character. Use of {@link Character#toCodePoint} is generally preferred.
+	 * Converts the given surrogate pair into a 32-bit UCS-4 character. Use of
+	 * {@link Character#toCodePoint} is generally preferred.
 	 */
 	public static int toUCS4(final char c, final char d) {
-		assert Character.isHighSurrogate(c) && Character.isLowSurrogate(d);
-		return Character.toCodePoint(c, d);
+		if (Character.isHighSurrogate(c) && Character.isLowSurrogate(d)) {
+			return Character.toCodePoint(c, d);
+		} else {
+			throw new IllegalArgumentException(
+					"'" + c + "' should be highSurrogate and '" + d + "' should be in lowSurrogate");
+		}
 	}
 
 	/**
-	 * Surrogate parsing support. Charset implementations may use instances of this class to handle the details of parsing UTF-16 surrogate pairs.
+	 * Surrogate parsing support. Charset implementations may use instances of this
+	 * class to handle the details of parsing UTF-16 surrogate pairs.
 	 */
 	public static class Parser {
-
-		public Parser() {
-		}
 
 		private int character; // UCS-4
 
@@ -132,7 +148,8 @@ public class Surrogate {
 		}
 
 		/**
-		 * Tells whether or not the previously-parsed UCS-4 character was originally represented by a surrogate pair.
+		 * Tells whether or not the previously-parsed UCS-4 character was originally
+		 * represented by a surrogate pair.
 		 */
 		public boolean isPair() {
 			assert error == null;
@@ -148,7 +165,8 @@ public class Surrogate {
 		}
 
 		/**
-		 * If the previous parse operation detected an error, return the object describing that error.
+		 * If the previous parse operation detected an error, return the object
+		 * describing that error.
 		 */
 		public CoderResult error() {
 			assert error != null;
@@ -156,7 +174,8 @@ public class Surrogate {
 		}
 
 		/**
-		 * Returns an unmappable-input result object, with the appropriate input length, for the previously-parsed character.
+		 * Returns an unmappable-input result object, with the appropriate input length,
+		 * for the previously-parsed character.
 		 */
 		public CoderResult unmappableResult() {
 			assert error == null;
@@ -165,10 +184,13 @@ public class Surrogate {
 
 		/**
 		 * Parses a UCS-4 character from the given source buffer, handling surrogates.
-		 * @param c The first character
-		 * @param in The source buffer, from which one more character will be consumed if c is a high surrogate
-		 * @returns Either a parsed UCS-4 character, in which case the isPair() and increment() methods will return meaningful values, or -1, in which
-		 * case error() will return a descriptive result object
+		 * 
+		 * @param c  The first character
+		 * @param in The source buffer, from which one more character will be consumed
+		 *           if c is a high surrogate
+		 * @returns Either a parsed UCS-4 character, in which case the isPair() and
+		 *          increment() methods will return meaningful values, or -1, in which
+		 *          case error() will return a descriptive result object
 		 */
 		public int parse(final char c, final CharBuffer in) {
 			if (Character.isHighSurrogate(c)) {
@@ -198,15 +220,20 @@ public class Surrogate {
 
 		/**
 		 * Parses a UCS-4 character from the given source buffer, handling surrogates.
-		 * @param c The first character
-		 * @param ia The input array, from which one more character will be consumed if c is a high surrogate
+		 * 
+		 * @param c  The first character
+		 * @param ia The input array, from which one more character will be consumed if
+		 *           c is a high surrogate
 		 * @param ip The input index
 		 * @param il The input limit
-		 * @returns Either a parsed UCS-4 character, in which case the isPair() and increment() methods will return meaningful values, or -1, in which
-		 * case error() will return a descriptive result object
+		 * @returns Either a parsed UCS-4 character, in which case the isPair() and
+		 *          increment() methods will return meaningful values, or -1, in which
+		 *          case error() will return a descriptive result object
 		 */
 		public int parse(final char c, final char[] ia, final int ip, final int il) {
-			assert ia[ip] == c;
+			if (ia[ip] != c) {
+				throw new AssertionError();
+			}
 			if (Character.isHighSurrogate(c)) {
 				if (il - ip < 2) {
 					error = CoderResult.UNDERFLOW;
@@ -235,18 +262,16 @@ public class Surrogate {
 	}
 
 	/**
-	 * Surrogate generation support. Charset implementations may use instances of this class to handle the details of generating UTF-16 surrogate
-	 * pairs.
+	 * Surrogate generation support. Charset implementations may use instances of
+	 * this class to handle the details of generating UTF-16 surrogate pairs.
 	 */
 	public static class Generator {
-
-		public Generator() {
-		}
 
 		private CoderResult error = CoderResult.OVERFLOW;
 
 		/**
-		 * If the previous generation operation detected an error, return the object describing that error.
+		 * If the previous generation operation detected an error, return the object
+		 * describing that error.
 		 */
 		public CoderResult error() {
 			assert error != null;
@@ -254,12 +279,17 @@ public class Surrogate {
 		}
 
 		/**
-		 * Generates one or two UTF-16 characters to represent the given UCS-4 character.
-		 * @param uc The UCS-4 character
-		 * @param len The number of input bytes from which the UCS-4 value was constructed (used when creating result objects)
-		 * @param dst The destination buffer, to which one or two UTF-16 characters will be written
-		 * @returns Either a positive count of the number of UTF-16 characters written to the destination buffer, or -1, in which case error() will
-		 * return a descriptive result object
+		 * Generates one or two UTF-16 characters to represent the given UCS-4
+		 * character.
+		 * 
+		 * @param uc  The UCS-4 character
+		 * @param len The number of input bytes from which the UCS-4 value was
+		 *            constructed (used when creating result objects)
+		 * @param dst The destination buffer, to which one or two UTF-16 characters will
+		 *            be written
+		 * @returns Either a positive count of the number of UTF-16 characters written
+		 *          to the destination buffer, or -1, in which case error() will return
+		 *          a descriptive result object
 		 */
 		public int generate(final int uc, final int len, final CharBuffer dst) {
 			if (Character.isBmpCodePoint(uc)) {
@@ -291,14 +321,19 @@ public class Surrogate {
 		}
 
 		/**
-		 * Generates one or two UTF-16 characters to represent the given UCS-4 character.
-		 * @param uc The UCS-4 character
-		 * @param len The number of input bytes from which the UCS-4 value was constructed (used when creating result objects)
-		 * @param da The destination array, to which one or two UTF-16 characters will be written
-		 * @param dp The destination position
-		 * @param dl The destination limit
-		 * @returns Either a positive count of the number of UTF-16 characters written to the destination buffer, or -1, in which case error() will
-		 * return a descriptive result object
+		 * Generates one or two UTF-16 characters to represent the given UCS-4
+		 * character.
+		 * 
+		 * @param uc  The UCS-4 character
+		 * @param len The number of input bytes from which the UCS-4 value was
+		 *            constructed (used when creating result objects)
+		 * @param da  The destination array, to which one or two UTF-16 characters will
+		 *            be written
+		 * @param dp  The destination position
+		 * @param dl  The destination limit
+		 * @returns Either a positive count of the number of UTF-16 characters written
+		 *          to the destination buffer, or -1, in which case error() will return
+		 *          a descriptive result object
 		 */
 		public int generate(final int uc, final int len, final char[] da, final int dp, final int dl) {
 			if (Character.isBmpCodePoint(uc)) {

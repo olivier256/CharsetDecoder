@@ -1,5 +1,3 @@
-package charset;
-
 /*
  * Copyright (c) 2000, 2004, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -25,12 +23,17 @@ package charset;
  * questions.
  */
 
+package charset;
+
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CoderResult;
 
+/**
+ * @see http://www.docjar.com/src/api/sun/nio/cs/ISO_8859_1.java
+ */
 public abstract class AbstractSingleByteCharacterSetCharsetDecoder extends CharsetDecoder implements ArrayDecoder {
 	protected AbstractSingleByteCharacterSetCharsetDecoder(final Charset cs) {
 		super(cs, 1.0f, 1.0f);
@@ -49,14 +52,21 @@ public abstract class AbstractSingleByteCharacterSetCharsetDecoder extends Chars
 		byte[] sa = src.array();
 		int sp = src.arrayOffset() + src.position();
 		int sl = src.arrayOffset() + src.limit();
-		assert sp <= sl;
-		sp = sp <= sl ? sp : sl;
+		if (sp > sl) {
+			throw new AssertionError();
+		}
+		/**
+		 * assert sp <= sl; sp = sp <= sl ? sp : sl;
+		 */
 		char[] da = dst.array();
 		int dp = dst.arrayOffset() + dst.position();
 		int dl = dst.arrayOffset() + dst.limit();
-		assert dp <= dl;
-		dp = dp <= dl ? dp : dl;
-
+		if (dp > dl) {
+			throw new AssertionError();
+		}
+		/**
+		 * assert dp <= dl; dp = dp <= dl ? dp : dl;
+		 */
 		try {
 			while (sp < sl) {
 				byte b = sa[sp];
@@ -74,7 +84,8 @@ public abstract class AbstractSingleByteCharacterSetCharsetDecoder extends Chars
 		}
 	}
 
-	protected abstract char byteToChar(final int b);
+	/** @return (char)(b & 0xff) */
+	protected abstract char byteToChar(final int i);
 
 	private CoderResult decodeBufferLoop(final ByteBuffer src, final CharBuffer dst) {
 		int mark = src.position();
@@ -101,7 +112,8 @@ public abstract class AbstractSingleByteCharacterSetCharsetDecoder extends Chars
 		}
 		int dp = 0;
 		while (dp < len) {
-			final char c = byteToChar(src[sp++] & 0xff);
+			byte b = src[sp++];
+			final char c = byteToChar(b & 0xff);
 			dst[dp++] = c;
 		}
 		return dp;
