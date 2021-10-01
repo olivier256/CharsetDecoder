@@ -7,10 +7,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Arrays;
 
-/**
- * @see http://www.docjar.com/src/api/sun/nio/cs/ISO_8859_1.java
- */
-public class CodePage850 extends AbstractCharset {
+public class CodePage850 extends AbstractSingleByteCharset {
 	public static final String CANONICAL_NAME = "CP_850";
 	private static final char[] CHARSET;
 	static {
@@ -38,22 +35,12 @@ public class CodePage850 extends AbstractCharset {
 	}
 
 	public CodePage850() {
-		super(CANONICAL_NAME, CodePage850.class);
+		super(CANONICAL_NAME);
 	}
 
 	@Override
-	protected char getChar(int b) {
+	public char decode(int b) {
 		return CHARSET[b];
-	}
-
-	@Override
-	protected byte getByte(char c) {
-		for (int i = 0; i < CHARSET.length; i++) {
-			if (CHARSET[i] == c) {
-				return (byte) i;
-			}
-		}
-		throw new IllegalArgumentException("Unable to find char '" + c + "'");
 	}
 
 	public static void main(final String[] args) {

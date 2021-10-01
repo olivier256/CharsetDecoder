@@ -1,9 +1,6 @@
 package charset;
 
-/**
- * @see http://www.docjar.com/src/api/sun/nio/cs/ISO_8859_1.java
- */
-public class MacOSRoman extends AbstractCharset {
+public class MacOSRoman extends AbstractSingleByteCharset {
 	public static final String CANONICAL_NAME = "MAC_OS_ROMAN";
 	private static final char[] CHARSET = new char[] { //
 			'\u0000', '\u0001', '\u0002', '\u0003', '\u0004', '\u0005', '\u0006', '\u0007', //
@@ -40,18 +37,12 @@ public class MacOSRoman extends AbstractCharset {
 			'\u00AF', '\u02D8', '\u02D9', '\u02DA', '\u00B8', '\u02DD', '\u02DB', '\u02C7' };
 
 	public MacOSRoman() {
-		super(CANONICAL_NAME, MacOSRoman.class);
+		super(CANONICAL_NAME);
 	}
 
 	@Override
-	protected char getChar(int i) {
+	public char decode(int i) {
 		return CHARSET[i];
-	}
-
-	@Override
-	protected byte getByte(char c) {
-		// TODO Auto-generated method stub
-		return 0;
 	}
 
 	public static void main(final String[] args) {
