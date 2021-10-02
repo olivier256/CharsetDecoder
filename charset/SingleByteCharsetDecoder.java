@@ -34,10 +34,12 @@ import java.nio.charset.CoderResult;
 /**
  * @see http://www.docjar.com/src/api/sun/nio/cs/ISO_8859_1.java
  */
-public abstract class AbstractSingleByteCharsetDecoder extends CharsetDecoder
-		implements ArrayDecoder, ByteDecoder {
-	protected AbstractSingleByteCharsetDecoder(final Charset cs) {
+public class SingleByteCharsetDecoder extends CharsetDecoder {
+	private final char[] charset;
+
+	protected SingleByteCharsetDecoder(final Charset cs, final char[] charset) {
 		super(cs, 1.0f, 1.0f);
+		this.charset = charset;
 	}
 
 	@Override
@@ -79,6 +81,10 @@ public abstract class AbstractSingleByteCharsetDecoder extends CharsetDecoder
 		}
 	}
 
+	private char decode(int b) {
+		return charset[b];
+	}
+
 	private CoderResult decodeBufferLoop(final ByteBuffer src, final CharBuffer dst) {
 		int mark = src.position();
 		try {
@@ -97,17 +103,4 @@ public abstract class AbstractSingleByteCharsetDecoder extends CharsetDecoder
 		}
 	}
 
-	@Override
-	public int decode(final byte[] src, int sp, int len, final char[] dst) {
-		if (len > dst.length) {
-			len = dst.length;
-		}
-		int dp = 0;
-		while (dp < len) {
-			byte b = src[sp++];
-			final char c = decode(b & 0xff);
-			dst[dp++] = c;
-		}
-		return dp;
-	}
 }

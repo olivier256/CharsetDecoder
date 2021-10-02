@@ -34,11 +34,14 @@ import java.nio.charset.CoderResult;
 /**
  * @see http://www.docjar.com/src/api/sun/nio/cs/ISO_8859_1.java
  */
-public abstract class AbstractSingleByteCharacterSetEncoder extends CharsetEncoder
-		implements ArrayEncoder, CharEncoder {
+public class SingleByteCharacterSetEncoder extends CharsetEncoder {
+	private final Surrogate.Parser parser;
+	private final char[] charset;
 
-	protected AbstractSingleByteCharacterSetEncoder(Charset cs) {
+	protected SingleByteCharacterSetEncoder(Charset cs, final char[] charset) {
 		super(cs, 1.0f, 1.0f);
+		parser = new Surrogate.Parser();
+		this.charset = charset;
 	}
 
 	@Override
@@ -51,7 +54,13 @@ public abstract class AbstractSingleByteCharacterSetEncoder extends CharsetEncod
 		return true; // we accept any byte value
 	}
 
-	private final Surrogate.Parser sgp = new Surrogate.Parser();
+	@Override
+	protected CoderResult encodeLoop(CharBuffer src, ByteBuffer dst) {
+		if (src.hasArray() && dst.hasArray())
+			return encodeArrayLoop(src, dst);
+		else
+			return encodeBufferLoop(src, dst);
+	}
 
 	private CoderResult encodeArrayLoop(CharBuffer src, ByteBuffer dst) {
 		char[] sa = src.array();
@@ -77,15 +86,26 @@ public abstract class AbstractSingleByteCharacterSetEncoder extends CharsetEncod
 					sp++;
 					continue;
 				}
-				if (sgp.parse(c, sa, sp, sl) < 0)
-					return sgp.error();
-				return sgp.unmappableResult();
+				if (parser.parse(c, sa, sp, sl) < 0)
+					return parser.error();
+				return parser.unmappableResult();
 			}
 			return CoderResult.UNDERFLOW;
 		} finally {
 			src.position(sp - src.arrayOffset());
 			dst.position(dp - dst.arrayOffset());
 		}
+	}
+
+	private byte encode(char c) {
+		for (int b = 0; b < 256; b++) {
+			char _c = charset[b];
+			if (_c == c) {
+				return (byte) b;
+			}
+		}
+		throw new IllegalArgumentException("Unable to find char '" + c + "'");
+
 	}
 
 	private CoderResult encodeBufferLoop(CharBuffer src, ByteBuffer dst) {
@@ -100,9 +120,9 @@ public abstract class AbstractSingleByteCharacterSetEncoder extends CharsetEncod
 					mark++;
 					continue;
 				}
-				if (sgp.parse(c, src) < 0)
-					return sgp.error();
-				return sgp.unmappableResult();
+				if (parser.parse(c, src) < 0)
+					return parser.error();
+				return parser.unmappableResult();
 			}
 			return CoderResult.UNDERFLOW;
 		} finally {
@@ -110,38 +130,120 @@ public abstract class AbstractSingleByteCharacterSetEncoder extends CharsetEncod
 		}
 	}
 
-	protected CoderResult encodeLoop(CharBuffer src, ByteBuffer dst) {
-		if (src.hasArray() && dst.hasArray())
-			return encodeArrayLoop(src, dst);
-		else
-			return encodeBufferLoop(src, dst);
-	}
+	private static class Surrogate {
 
-	private byte repl = (byte) '?';
-
-	@Override
-	protected void implReplaceWith(byte[] newReplacement) {
-		repl = newReplacement[0];
-	}
-
-	public int encode(char[] src, int sp, int len, byte[] dst) {
-		int dp = 0;
-		int sl = sp + Math.min(len, dst.length);
-		while (sp < sl) {
-			char c = src[sp++];
-			if (c <= '\u00FF') {
-				dst[dp++] = encode(c);
-				continue;
-			}
-			if (Character.isHighSurrogate(c) && sp < sl && Character.isLowSurrogate(src[sp])) {
-				if (len > dst.length) {
-					sl++;
-					len--;
-				}
-				sp++;
-			}
-			dst[dp++] = repl;
+		private Surrogate() {
 		}
-		return dp;
+
+		/**
+		 * Surrogate parsing support. Charset implementations may use instances of this
+		 * class to handle the details of parsing UTF-16 surrogate pairs.
+		 */
+		public static class Parser {
+
+			private int character; // UCS-4
+
+			private CoderResult error = CoderResult.UNDERFLOW;
+
+			private boolean isPair;
+
+			/**
+			 * If the previous parse operation detected an error, return the object
+			 * describing that error.
+			 */
+			public CoderResult error() {
+				assert error != null;
+				return error;
+			}
+
+			/**
+			 * Returns an unmappable-input result object, with the appropriate input length,
+			 * for the previously-parsed character.
+			 */
+			public CoderResult unmappableResult() {
+				assert error == null;
+				return CoderResult.unmappableForLength(isPair ? 2 : 1);
+			}
+
+			/**
+			 * Parses a UCS-4 character from the given source buffer, handling surrogates.
+			 * 
+			 * @param c  The first character
+			 * @param in The source buffer, from which one more character will be consumed
+			 *           if c is a high surrogate
+			 * @returns Either a parsed UCS-4 character, in which case the isPair() and
+			 *          increment() methods will return meaningful values, or -1, in which
+			 *          case error() will return a descriptive result object
+			 */
+			public int parse(final char c, final CharBuffer in) {
+				if (Character.isHighSurrogate(c)) {
+					if (!in.hasRemaining()) {
+						error = CoderResult.UNDERFLOW;
+						return -1;
+					}
+					char d = in.get();
+					if (Character.isLowSurrogate(d)) {
+						character = Character.toCodePoint(c, d);
+						isPair = true;
+						error = null;
+						return character;
+					}
+					error = CoderResult.malformedForLength(1);
+					return -1;
+				}
+				if (Character.isLowSurrogate(c)) {
+					error = CoderResult.malformedForLength(1);
+					return -1;
+				}
+				character = c;
+				isPair = false;
+				error = null;
+				return character;
+			}
+
+			/**
+			 * Parses a UCS-4 character from the given source buffer, handling surrogates.
+			 * 
+			 * @param c  The first character
+			 * @param ia The input array, from which one more character will be consumed if
+			 *           c is a high surrogate
+			 * @param ip The input index
+			 * @param il The input limit
+			 * @returns Either a parsed UCS-4 character, in which case the isPair() and
+			 *          increment() methods will return meaningful values, or -1, in which
+			 *          case error() will return a descriptive result object
+			 */
+			public int parse(final char c, final char[] ia, final int ip, final int il) {
+				if (ia[ip] != c) {
+					throw new AssertionError();
+				}
+				if (Character.isHighSurrogate(c)) {
+					if (il - ip < 2) {
+						error = CoderResult.UNDERFLOW;
+						return -1;
+					}
+					char d = ia[ip + 1];
+					if (Character.isLowSurrogate(d)) {
+						character = Character.toCodePoint(c, d);
+						isPair = true;
+						error = null;
+						return character;
+					}
+					error = CoderResult.malformedForLength(1);
+					return -1;
+				}
+				if (Character.isLowSurrogate(c)) {
+					error = CoderResult.malformedForLength(1);
+					return -1;
+				}
+				character = c;
+				isPair = false;
+				error = null;
+				return character;
+			}
+
+		}
+
 	}
+
 }
