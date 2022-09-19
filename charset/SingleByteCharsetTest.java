@@ -1,5 +1,10 @@
 package charset;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
 
 /**
@@ -24,23 +29,29 @@ public class SingleByteCharsetTest {
 
 	public void testCP850Decode() {
 		final Charset charset = SingleByteCharsets.CP_850;
-		final byte A_GRAVE = (byte) 0xb7;
-		String s = "_ partir de";
-		byte[] bytes = s.getBytes();
-		bytes[0] = A_GRAVE;
-		String actual = new String(bytes, charset);
-		String expected = "À partir de";
-		assert actual.equals(expected) : "expected='" + expected + "';actual='" + actual + "'";
-
+		final byte A_GRAVE_IN_CP850 = (byte) 0xb7;
+		byte[] byteArray = new byte[] { A_GRAVE_IN_CP850 };
+		try (ByteArrayInputStream bais = new ByteArrayInputStream(byteArray);
+				InputStreamReader isw = new InputStreamReader(bais, charset)) {
+			char c = (char) isw.read();
+			assert 'À' == c : "expected=À;actual=" + c;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void testCP850Encode() {
 		Charset charset = SingleByteCharsets.CP_850;
-		byte expected = (byte) 0xb7;
-		byte actual = charset.encode("À partir de").array()[0];
-		assert expected == actual : "expected=0x" + Integer.toHexString(actual) + ";actualCharacterAt0=0x"
-				+ Integer.toHexString(actual);
-
+		try (ByteArrayOutputStream baos = new ByteArrayOutputStream(1);
+				OutputStreamWriter os = new OutputStreamWriter(baos, charset)) {
+			os.write("À");
+			os.flush();
+			byte[] byteArray = baos.toByteArray();
+			byte actual = byteArray[0];
+			assert (byte) 0xb7 == actual : "expected=0xb7;actual=0x" + Integer.toHexString(actual);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void testMacOSRomanDecode() {
